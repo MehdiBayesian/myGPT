@@ -11,6 +11,7 @@
 *.sln.docstates
 *scratch/
 *.env
+*sessions_history/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
