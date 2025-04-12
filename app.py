@@ -4,7 +4,11 @@ import gradio as gr
 import os
 from dotenv import load_dotenv
 # Import the central LLM client function
-from src.llm_client import get_llm_response # Assuming this returns a string
+from src.llm_client import (
+    get_llm_response, # Assuming this returns a string
+    get_backend_llm_info
+)
+    
 from src.session_manager import (
     list_sessions,
     load_history, # Returns messages format: [{"role": ..., "content": ...}]
@@ -209,9 +213,9 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
 
 # --- Launch the Application ---
 if __name__ == "__main__":
-    # backend = os.getenv('LLM_BACKEND', 'openai')
-    backend = os.getenv('LLM_BACKEND', 'ollama') # Default to 'ollama' for local testing
-    print(f"--- Using LLM Backend: {backend} ---")
+    # load .env file to setup LLM backend.
+    # display information 
+    print(get_backend_llm_info())
 
     ensure_session_dir()
     demo.launch(debug=True) # Launch in debug mode to see more details in console if errors occur

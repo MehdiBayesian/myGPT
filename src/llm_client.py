@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Configuration ---
-LLM_BACKEND = os.getenv("LLM_BACKEND", "ollama").lower() # Default to openai
+LLM_BACKEND = os.getenv("LLM_BACKEND") # Should be 'openai' or 'ollama'
 
 # OpenAI Config
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -18,8 +18,19 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 # Ollama Config
 OLLAMA_HOST_URL = os.getenv("OLLAMA_HOST_URL", "http://localhost:11434") # Default Ollama host
 # OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama:latest") # Required if using Ollama
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:1b") # Required if using Ollama
+# Accepted values: "tinyllama:latest" or "gemma3:1b"
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL") # Required if using Ollama
 
+def get_backend_llm_info() -> str:
+    """Displays the LLM backend configuration."""
+    info = f"LLM_BACKEND: {LLM_BACKEND}\n"
+    if LLM_BACKEND == "openai":
+        info += f"--- Using OpenAI Backend: {OPENAI_MODEL} ---"
+    elif LLM_BACKEND == "ollama":
+        info += f"--- Using Ollama Backend: {OLLAMA_MODEL} at {OLLAMA_HOST_URL} ---"
+    else:
+        info += f"Error: Invalid LLM_BACKEND specified: {LLM_BACKEND}. Use 'openai' or 'ollama'."
+    return info
 
 # --- OpenAI Client ---
 def _get_openai_response(history_messages: list[dict]) -> str:
