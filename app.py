@@ -1,11 +1,10 @@
-# --- START OF FILE app.py ---
-
 import gradio as gr
 import os
 from dotenv import load_dotenv
 # Import the central LLM client function
 from src.llm_client import (
-    get_llm_response, # Assuming this returns a string
+    get_llm_response, # Non-streaming
+    get_llm_streaming_response, # Streaming
     get_backend_llm_info
 )
     
@@ -99,25 +98,38 @@ def add_message(session_id, current_history: list, message: str):
         print(f"DEBUG: First yield (existing session {session_id}) -> update radio value")
         yield history_messages, history_messages, session_id, radio_update_same_list
 
-    # --- Get LLM Response ---
+    # --- Get LLM Response with Streaming ---
     # The history_messages list is already in the format needed by llm_client
-    print(f"DEBUG: Getting LLM response for history: {history_messages}")
-    bot_response_text = get_llm_response(history_messages) # Expecting a string response
-    print(f"LLM response received: {bot_response_text[:100]}...")
-
-    # --- Append bot response in the correct format ---
-    history_messages.append({"role": "assistant", "content": bot_response_text})
-    print(f"DEBUG: Appended assistant message. History is now: {history_messages}") # Debug print
+    print(f"DEBUG: Getting streaming LLM response for history: {history_messages}")
+    
+    # Initialize assistant's response in history_messages
+    history_messages.append({"role": "assistant", "content": ""})
+    
+    # Use a temporary variable to accumulate streaming chunks
+    full_response = ""
+    
+    # Process each chunk from the streaming response
+    for chunk in get_llm_streaming_response(history_messages[:-1]):  # Send history without empty assistant message
+        # Accumulate the full response
+        full_response += chunk
+        
+        # Update the assistant's message in history
+        history_messages[-1]["content"] = full_response
+        
+        # Yield the intermediate update
+        yield history_messages, history_messages, session_id, gr.skip()
+    
+    print(f"LLM streaming response complete: {full_response[:100]}...")
 
     # --- Save the updated history (which is in 'messages' format) ---
     save_history(session_id, history_messages)
     print(f"History saved for session: {session_id}")
 
-    # --- Second Yield: Show bot response and updated session list ---
+    # --- Final Yield: Update session list ---
     # Get the latest session list AFTER saving
     updated_sessions_after_save = get_initial_sessions()
     radio_update_after_save = gr.Radio(choices=updated_sessions_after_save, value=session_id)
-    print("DEBUG: Second yield -> update chat and radio list")
+    print("DEBUG: Final yield -> update radio list")
     # Yield the final history_messages list. It MUST be in the correct format here.
     yield history_messages, history_messages, session_id, radio_update_after_save
 
