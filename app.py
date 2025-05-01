@@ -3,7 +3,6 @@ import os
 from dotenv import load_dotenv
 # Import the central LLM client function
 from src.llm_client import (
-    get_llm_response, # Non-streaming
     get_llm_streaming_response, # Streaming
     get_backend_llm_info
 )
