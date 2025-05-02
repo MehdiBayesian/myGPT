@@ -1,6 +1,5 @@
 # src/llm_client.py
 import os
-import openai
 import requests
 import json
 from typing import Generator, Dict, List, Any
@@ -14,9 +13,7 @@ LLM_BACKEND = os.getenv("LLM_BACKEND") # Should be 'openai' or 'ollama'
 
 # Ollama Config
 OLLAMA_HOST_URL = os.getenv("OLLAMA_HOST_URL", "http://localhost:11434") # Default Ollama host
-# OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "tinyllama:latest") # Required if using Ollama
-# Accepted values: "tinyllama:latest" or "gemma3:1b"
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL") # Required if using Ollama
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL") # Ollama model name. For the latest list: https://ollama.com/search
 
 def get_backend_llm_info() -> str:
     """Displays the LLM backend configuration."""
