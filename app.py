@@ -1,12 +1,10 @@
-import gradio as gr
 import os
+import gradio as gr
 from dotenv import load_dotenv
-# Import the central LLM client function
 from src.llm_client import (
     get_llm_streaming_response, # Streaming
     get_backend_llm_info
-)
-    
+)    
 from src.session_manager import (
     list_sessions,
     load_history, # Returns messages format: [{"role": ..., "content": ...}]
@@ -295,4 +293,4 @@ if __name__ == "__main__":
     print(get_backend_llm_info())
 
     ensure_session_dir()
-    demo.launch(debug=True) # Launch in debug mode to see more details in console if errors occur
+    demo.launch(debug=True, share=False) # Launch in debug mode to see more details in console if errors occur
