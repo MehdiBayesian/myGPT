@@ -166,7 +166,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
 
     initial_sessions = get_initial_sessions() # Get initial list [(title, id), ...]
 
-    gr.Markdown("# Gradio Chat Interface")
+    gr.Markdown("# A Humble GPT")
     with gr.Row():
         # Column 1: Session List
         with gr.Column(scale=1, min_width=200):
