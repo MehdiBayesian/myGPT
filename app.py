@@ -21,6 +21,10 @@ load_dotenv()
 # --- Constants ---
 MAX_SESSIONS_DISPLAY = 10
 
+# --- Global stop signal variable ---
+# This is our "emergency brake" that can be accessed from any function
+STOP_STREAMING = False
+
 # --- Ensure Session Directory Exists ---
 ensure_session_dir()
 
@@ -59,18 +63,19 @@ def add_message(session_id, current_history: list, message: str):
     Yields:
         tuple: Updates for Gradio components.
     """
+    global STOP_STREAMING
+    # Reset stop signal at the beginning
+    STOP_STREAMING = False
+    
     if not message or not message.strip():
         # If input is empty, just return current state without changes
-        # Refreshing radio might be desired, but let's keep it simple first
         current_sessions = get_initial_sessions()
         radio_update = gr.Radio(choices=current_sessions, value=session_id)
         # Yield current history back to chatbot and state
-        yield current_history, current_history, session_id, radio_update
+        yield current_history, current_history, session_id, radio_update, False, gr.Button(visible=True), gr.Button(visible=False), gr.Textbox(interactive=True)
         return # Stop processing
 
     # --- Ensure `history_messages` is a valid list (using the input `current_history`) ---
-    # It should already be in the correct format if loaded/reset correctly.
-    # Create a mutable copy to work with if needed, or work directly if state handling is correct.
     history_messages = list(current_history) # Make a mutable copy from state
 
     new_session_created = False
@@ -84,21 +89,20 @@ def add_message(session_id, current_history: list, message: str):
     history_messages.append({"role": "user", "content": message})
     print(f"DEBUG: Appended user message. History is now: {history_messages}") # Debug print
 
-    # --- First Yield: Show user message ---
-    # Yield the updated history_messages list. It MUST be in the correct format here.
-    # Use gr.skip() for radio update on new session creation to prevent inconsistency.
+    # --- First Yield: Show user message and update button visibility ---
     if new_session_created:
         print("DEBUG: First yield (new session) -> skip radio")
-        yield history_messages, history_messages, session_id, gr.skip()
+        # Set is_streaming to True and update button visibility
+        yield history_messages, history_messages, session_id, gr.skip(), True, gr.Button(visible=False), gr.Button(visible=True), gr.Textbox(interactive=False)
     else:
         # Update radio to ensure the current session remains selected
         current_sessions = get_initial_sessions()
         radio_update_same_list = gr.Radio(choices=current_sessions, value=session_id)
         print(f"DEBUG: First yield (existing session {session_id}) -> update radio value")
-        yield history_messages, history_messages, session_id, radio_update_same_list
+        # Set is_streaming to True and update button visibility
+        yield history_messages, history_messages, session_id, radio_update_same_list, True, gr.Button(visible=False), gr.Button(visible=True), gr.Textbox(interactive=False)
 
     # --- Get LLM Response with Streaming ---
-    # The history_messages list is already in the format needed by llm_client
     print(f"DEBUG: Getting streaming LLM response for history: {history_messages}")
     
     # Initialize assistant's response in history_messages
@@ -108,15 +112,35 @@ def add_message(session_id, current_history: list, message: str):
     full_response = ""
     
     # Process each chunk from the streaming response
-    for chunk in get_llm_streaming_response(history_messages[:-1]):  # Send history without empty assistant message
-        # Accumulate the full response
-        full_response += chunk
-        
-        # Update the assistant's message in history
+    was_stopped = False
+    try:
+        for chunk in get_llm_streaming_response(history_messages[:-1]):  # Send history without empty assistant message
+            # Check if stop signal is active - using global variable
+            if STOP_STREAMING:
+                print("Streaming stopped by user")
+                was_stopped = True
+                break
+                
+            # Accumulate the full response
+            full_response += chunk
+            
+            # Update the assistant's message in history
+            history_messages[-1]["content"] = full_response
+            
+            # Yield the intermediate update (keep button visibility during streaming)
+            yield history_messages, history_messages, session_id, gr.skip(), True, gr.Button(visible=False), gr.Button(visible=True), gr.Textbox(interactive=False)
+    
+    except Exception as e:
+        # Handle any exceptions during streaming
+        print(f"Error during streaming: {e}")
+        if not full_response:
+            full_response = f"Sorry, an error occurred: {str(e)}"
+            history_messages[-1]["content"] = full_response
+    
+    # Add message indicating if the response was stopped
+    if was_stopped:
+        full_response += "\n\n[Response was stopped early]"
         history_messages[-1]["content"] = full_response
-        
-        # Yield the intermediate update
-        yield history_messages, history_messages, session_id, gr.skip()
     
     print(f"LLM streaming response complete: {full_response[:100]}...")
 
@@ -124,13 +148,13 @@ def add_message(session_id, current_history: list, message: str):
     save_history(session_id, history_messages)
     print(f"History saved for session: {session_id}")
 
-    # --- Final Yield: Update session list ---
-    # Get the latest session list AFTER saving
+    # --- Final Yield: Update session list and reset button visibility ---
     updated_sessions_after_save = get_initial_sessions()
     radio_update_after_save = gr.Radio(choices=updated_sessions_after_save, value=session_id)
     print("DEBUG: Final yield -> update radio list")
-    # Yield the final history_messages list. It MUST be in the correct format here.
-    yield history_messages, history_messages, session_id, radio_update_after_save
+    # Yield the final history_messages list and update button visibility
+    # IMPORTANT: Set input field to interactive=True at the end
+    yield history_messages, history_messages, session_id, radio_update_after_save, False, gr.Button(visible=True), gr.Button(visible=False), gr.Textbox(interactive=True)
 
 
 # --- Gradio Interface Definition ---
@@ -138,6 +162,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
     # State variables store the current session ID and the chat history in 'messages' format
     current_session_id = gr.State(None)
     chat_history_state = gr.State([]) # Initialize with empty list for messages format
+    is_streaming = gr.State(False)    # Added state to track if currently streaming
 
     initial_sessions = get_initial_sessions() # Get initial list [(title, id), ...]
 
@@ -169,23 +194,64 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
                     show_label=False,
                 )
                 send_button = gr.Button("Send", variant="primary", scale=1, min_width=80)
+                # Make the stop button more noticeable with red color
+                stop_button = gr.Button("Stop", variant="stop", scale=1, min_width=80, visible=False, elem_classes="stop-button")
+
+    # Add some CSS to make the stop button more noticeable
+    gr.Markdown("""
+    <style>
+    .stop-button {
+        background-color: #FF5252 !important;
+        color: white !important;
+        font-weight: bold !important;
+    }
+    </style>
+    """)
 
     # --- Event Handlers ---
 
     # 1. Sending a message (Enter or Button)
     send_event = user_input.submit(
         fn=add_message,
-        # Pass the current state values and the new message text
+        # Pass the current state values
         inputs=[current_session_id, chat_history_state, user_input],
-        # Expect yields, update chatbot, history state, session ID, and radio list
-        outputs=[chatbot_display, chat_history_state, current_session_id, session_list_display],
-    ).then(lambda: gr.Textbox(value=""), outputs=[user_input]) # Clear input
+        # Update all components including button visibility directly
+        outputs=[chatbot_display, chat_history_state, current_session_id, session_list_display, is_streaming, send_button, stop_button, user_input]
+    ).then(
+        lambda: gr.Textbox(value=""), 
+        outputs=[user_input]  # Clear input
+    )
 
     send_button.click(
         fn=add_message,
         inputs=[current_session_id, chat_history_state, user_input],
-        outputs=[chatbot_display, chat_history_state, current_session_id, session_list_display],
-    ).then(lambda: gr.Textbox(value=""), outputs=[user_input]) # Clear input
+        # Update all components including button visibility directly
+        outputs=[chatbot_display, chat_history_state, current_session_id, session_list_display, is_streaming, send_button, stop_button, user_input]
+    ).then(
+        lambda: gr.Textbox(value=""), 
+        outputs=[user_input]  # Clear input
+    )
+
+    # Stop button handler - set stop signal to True using a global variable
+    def stop_streaming():
+        global STOP_STREAMING
+        STOP_STREAMING = True
+        print("Stop button clicked! Setting global STOP_STREAMING to True.")
+        # Re-enable input field immediately
+        return gr.Textbox(interactive=True)
+
+    stop_button.click(
+        fn=stop_streaming,
+        inputs=None,
+        outputs=[user_input]
+    )
+
+    # React to streaming state changes
+    is_streaming.change(
+        fn=lambda s: gr.Textbox(interactive=not s),
+        inputs=[is_streaming],
+        outputs=[user_input]
+    )
 
     # 2. Selecting a session from the list
     def load_session_and_update_state(session_id_from_radio):
@@ -215,7 +281,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
         inputs=None,
         outputs=[
             chatbot_display,         # Set to empty list []
-            current_session_id,    # Set to None
+            current_session_id,      # Set to None
             session_list_display,    # Update radio choices and clear selection
             chat_history_state,      # Set to empty list []
             user_input               # Set to empty string ""
