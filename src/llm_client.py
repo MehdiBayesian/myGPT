@@ -23,6 +23,11 @@ THINKING_MARKERS = {
     "deepseek-r1": ("<think>", "</think>"),
     # Add more models and their thinking markers as needed
 }
+# START_THINKING_MESSAGE = "🤔 [Started Thinking ...] "
+# END_THINKING_MESSAGE = " [... Done Thinking] 💡"
+START_THINKING_MESSAGE = "🤔 [Started Tak-Navazi ...] "
+END_THINKING_MESSAGE = " [... Done Tak-Navazi] 🏁 "
+
 
 def get_backend_llm_info() -> str:
     """Displays the LLM backend configuration."""
@@ -88,7 +93,7 @@ def get_ollama_streaming_response(history_messages: List[Dict[str, str]]) -> Gen
                                     if parts[0]:
                                         yield parts[0]
                                     # Yield our replacement for start thinking
-                                    yield "🤔 [Started Thinking ...] "
+                                    yield START_THINKING_MESSAGE
                                     # Reset buffer to content after marker
                                     buffer = parts[1]
                                     in_thinking_mode = True
@@ -102,7 +107,7 @@ def get_ollama_streaming_response(history_messages: List[Dict[str, str]]) -> Gen
                                     if parts[0]:
                                         yield parts[0]
                                     # Yield our replacement for end thinking
-                                    yield " [... Done Thinking] 💡"
+                                    yield END_THINKING_MESSAGE
                                     # Reset buffer to content after marker
                                     buffer = parts[1]
                                     in_thinking_mode = False

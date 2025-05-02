@@ -293,4 +293,4 @@ if __name__ == "__main__":
     print(get_backend_llm_info())
 
     ensure_session_dir()
-    demo.launch(debug=True, share=False) # Launch in debug mode to see more details in console if errors occur
+    demo.launch(debug=True, share=True) # Launch in debug mode to see more details in console if errors occur
