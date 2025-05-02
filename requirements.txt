@@ -1,3 +1,2 @@
-gradio
-dotenv
-openai
+gradio==5.29.0
+dotenv==0.9.9
