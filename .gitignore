@@ -12,6 +12,7 @@
 *scratch/
 *.env
 *sessions_history/
+*.gradio/
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
