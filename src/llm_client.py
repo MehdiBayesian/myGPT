@@ -19,8 +19,8 @@ print(OLLAMA_MODEL_BASE)
 # Dictionary mapping model names to their thinking markers
 # TODO: I need to fix this to be automatic based on model params. Seems like ollma has model params dictionary card that could be used? 
 THINKING_MARKERS = {
-    "deepseek-coder": ("<think>", "</think>"),
     "deepseek-r1": ("<think>", "</think>"),
+    "qwen3": ("<think>", "</think>"),
     # Add more models and their thinking markers as needed
 }
 # START_THINKING_MESSAGE = "🤔 [Started Thinking ...] "
