@@ -26,7 +26,7 @@ If run successfully, you will see a link of the form: https://48e6eb31eexxxxx.gr
 
 
 2. You can set the LLM model name in .env file 
-OLLAMA_MODEL=<YOUR_LOCALLY_AVAILABLE_LLM_MODEL_NAME> 
+`OLLAMA_MODEL=<YOUR_LOCALLY_AVAILABLE_LLM_MODEL_NAME>` 
 
 Example:
 ```
