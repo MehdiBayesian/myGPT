@@ -1,4 +1,5 @@
 import os
+import argparse
 import gradio as gr
 from dotenv import load_dotenv
 from src.llm_client import (
@@ -291,6 +292,11 @@ if __name__ == "__main__":
     # load .env file to setup LLM backend.
     # display information 
     print(get_backend_llm_info())
-
     ensure_session_dir()
-    demo.launch(debug=True, share=True) # Launch in debug mode to see more details in console if errors occur
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description="myGPT App using local LLM models.")
+    parser.add_argument("--share", action="store_true", help="Share the app publicly via Gradio https link.", default=False)
+    args = parser.parse_args()
+    
+    
+    demo.launch(debug=True, share=args.share) # Launch in debug mode to see more details in console if errors occur
