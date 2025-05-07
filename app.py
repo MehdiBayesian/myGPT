@@ -17,6 +17,9 @@ from src.session_manager import (
 # --- Load Environment Variables ---
 load_dotenv()
 
+# --- Configuration ---
+ADD_COPYRIGHT = True
+
 # --- Constants ---
 MAX_SESSIONS_DISPLAY = 10
 
@@ -157,6 +160,7 @@ def add_message(session_id, current_history: list, message: str):
 
 
 # --- Gradio Interface Definition ---
+
 with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan"), title="Gradio Chat") as demo:
     # State variables store the current session ID and the chat history in 'messages' format
     current_session_id = gr.State(None)
@@ -287,6 +291,12 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
         ],
     )
 
+    if ADD_COPYRIGHT is True:
+        gr.HTML(f"""
+            <div style="text-align: center; margin-top: 20px; padding: 10px;">
+                © 2025 Impartial GradientZ, LLC. All rights reserved.
+            </div>
+        """)
 # --- Launch the Application ---
 if __name__ == "__main__":
     # load .env file to setup LLM backend.
