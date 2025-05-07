@@ -37,6 +37,6 @@ OLLAMA_MODEL=gemma3:1b
 
 
 # TODO
-[ ] Add LLM model switch menu
-[ ] Add llama.cpp backend support
+- [ ] Add LLM model switch menu
+- [ ] Add llama.cpp backend support
 
