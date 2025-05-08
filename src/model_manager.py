@@ -2,6 +2,10 @@ from typing import List, Tuple, Optional
 import os
 import subprocess
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+# Load environment variables early
+load_dotenv()
 
 @dataclass
 class ModelConfig:
@@ -55,7 +59,8 @@ class ModelManager:
         return capitalized
 
     def _load_available_models(self):
-        """Load available models from Ollama."""
+        """Load available models from Ollama and set default from environment."""
+        # Get available models
         ollama_models = self._get_ollama_models()
         self._available_models = [
             ModelConfig(
@@ -66,18 +71,26 @@ class ModelManager:
             for model_name in ollama_models
         ]
         
-        # Set initial model from environment variable or first available
+        # Get default model from environment
         env_model = os.getenv("OLLAMA_MODEL")
+        
         if env_model:
+            print(f"Looking for default model from .env: {env_model}")
+            # Try to find the exact model from environment
             for model in self._available_models:
                 if model.name == env_model:
                     self._current_model = model
+                    print(f"Found and set default model: {model.name}")
                     break
+            
+            if not self._current_model:
+                print(f"Warning: Model {env_model} specified in .env not found in available models")
         
-        # If no model is set from environment, use the first available model
+        # If no model is set (either no env var or model not found), use first available
         if not self._current_model and self._available_models:
             self._current_model = self._available_models[0]
-            # Update environment variable
+            print(f"Using first available model as default: {self._current_model.name}")
+            # Update environment variable to match
             os.environ["OLLAMA_MODEL"] = self._current_model.name
 
     @property
@@ -92,6 +105,7 @@ class ModelManager:
                 self._current_model = model
                 # Update environment variable
                 os.environ["OLLAMA_MODEL"] = model_name
+                print(f"Model changed to: {model_name}")
                 break
 
     def get_model_choices(self) -> List[Tuple[str, str]]:
