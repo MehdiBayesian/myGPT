@@ -13,6 +13,7 @@ from src.session_manager import (
     create_new_session_id,
     ensure_session_dir
 )
+from src.model_manager import model_manager
 
 # --- Load Environment Variables ---
 load_dotenv()
@@ -52,7 +53,7 @@ def load_selected_session(session_id):
 
 
 # --- Core Chat Logic ---
-def add_message(session_id, current_history: list, message: str):
+def add_message(session_id, current_history: list, message: str, current_model: str):
     """
     Handles adding messages, getting LLM response, saving, and updating UI.
     Strictly uses the 'messages' format internally for history.
@@ -61,6 +62,7 @@ def add_message(session_id, current_history: list, message: str):
         session_id (str | None): The current session ID.
         current_history (list): The chat history in 'messages' format from chat_history_state.
         message (str): The new user message text.
+        current_model (str): The current model name.
 
     Yields:
         tuple: Updates for Gradio components.
@@ -166,27 +168,45 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
     current_session_id = gr.State(None)
     chat_history_state = gr.State([]) # Initialize with empty list for messages format
     is_streaming = gr.State(False)    # Added state to track if currently streaming
+    current_model_state = gr.State(model_manager.current_model.name if model_manager.current_model else None)
 
     initial_sessions = get_initial_sessions() # Get initial list [(title, id), ...]
 
     gr.Markdown("# A Humble GPT")
     with gr.Row():
-        # Column 1: Session List
+        # Left sidebar
         with gr.Column(scale=1, min_width=200):
-            gr.Markdown("## Sessions")
-            new_chat_button = gr.Button("➕ New Chat", variant="secondary")
-            session_list_display = gr.Radio(
-                label="Recent Sessions",
-                choices=initial_sessions, # Expects list of (label, value) tuples
-                value=None,
-                interactive=True,
-            )
+            # Model Selection
+            with gr.Group(visible=True):
+                gr.Markdown("## Model Selection")
+                model_dropdown = gr.Dropdown(
+                    label="Select Model",
+                    choices=model_manager.get_model_choices(),
+                    value=model_manager.current_model.name if model_manager.current_model else None,
+                    interactive=True,
+                    container=True,
+                )
+            
+            # Add some spacing
+            gr.Markdown("<br>")
+            
+            # Sessions
+            with gr.Group(visible=True):
+                gr.Markdown("## Sessions")
+                new_chat_button = gr.Button("➕ New Chat", variant="secondary")
+                session_list_display = gr.Radio(
+                    label="Recent Sessions",
+                    choices=initial_sessions,
+                    value=None,
+                    interactive=True,
+                    container=True,
+                )
 
-        # Column 2: Chat Interface
+        # Main chat area
         with gr.Column(scale=4):
             chatbot_display = gr.Chatbot(
                 label="Conversation",
-                type="messages", # Crucial: Use the 'messages' format
+                type="messages",
                 height=600,
                 show_copy_button=True,
             )
@@ -197,10 +217,9 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
                     show_label=False,
                 )
                 send_button = gr.Button("Send", variant="primary", scale=1, min_width=80)
-                # Make the stop button more noticeable with red color
                 stop_button = gr.Button("Stop", variant="stop", scale=1, min_width=80, visible=False, elem_classes="stop-button")
 
-    # Add some CSS to make the stop button more noticeable
+    # Add CSS styling
     gr.Markdown("""
     <style>
     .stop-button {
@@ -208,16 +227,55 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
         color: white !important;
         font-weight: bold !important;
     }
+    /* Style for groups */
+    .gr-group {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+        background-color: #ffffff;
+    }
     </style>
     """)
 
     # --- Event Handlers ---
 
+    # Model selection handler
+    def change_model(model_name):
+        """Changes the current model and starts a new chat."""
+        if model_name:
+            print(f"Changing model to: {model_name}")
+            model_manager.current_model = model_name
+            # Return values to trigger new chat and update model state
+            updated_sessions = get_initial_sessions()
+            return (
+                [], # chatbot_display
+                None, # current_session_id
+                gr.Radio(choices=updated_sessions, value=None), # session_list_display
+                [], # chat_history_state
+                "", # user_input
+                model_name, # current_model_state
+            )
+        return gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip(), gr.skip()
+
+    model_dropdown.change(
+        fn=change_model,
+        inputs=[model_dropdown],
+        outputs=[
+            chatbot_display,
+            current_session_id,
+            session_list_display,
+            chat_history_state,
+            user_input,
+            current_model_state,
+        ],
+    )
+
     # 1. Sending a message (Enter or Button)
     send_event = user_input.submit(
         fn=add_message,
         # Pass the current state values
-        inputs=[current_session_id, chat_history_state, user_input],
+        inputs=[current_session_id, chat_history_state, user_input, current_model_state],
         # Update all components including button visibility directly
         outputs=[chatbot_display, chat_history_state, current_session_id, session_list_display, is_streaming, send_button, stop_button, user_input]
     ).then(
@@ -227,7 +285,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
 
     send_button.click(
         fn=add_message,
-        inputs=[current_session_id, chat_history_state, user_input],
+        inputs=[current_session_id, chat_history_state, user_input, current_model_state],
         # Update all components including button visibility directly
         outputs=[chatbot_display, chat_history_state, current_session_id, session_list_display, is_streaming, send_button, stop_button, user_input]
     ).then(
@@ -277,7 +335,7 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
         print("UI: Starting new chat action.")
         updated_sessions = get_initial_sessions() # Get fresh list for the radio
         # Reset chatbot display, session ID state, radio selection, history state, and input field
-        return [], None, gr.Radio(choices=updated_sessions, value=None, label="Recent Sessions"), [], ""
+        return [], None, gr.Radio(choices=updated_sessions, value=None, label="Recent Sessions"), [], "", ""
 
     new_chat_button.click(
         fn=new_chat_action,
@@ -287,7 +345,8 @@ with gr.Blocks(theme=gr.themes.Default(primary_hue="blue", secondary_hue="cyan")
             current_session_id,      # Set to None
             session_list_display,    # Update radio choices and clear selection
             chat_history_state,      # Set to empty list []
-            user_input               # Set to empty string ""
+            user_input,             # Set to empty string ""
+            current_model_state,     # Set to None
         ],
     )
 
